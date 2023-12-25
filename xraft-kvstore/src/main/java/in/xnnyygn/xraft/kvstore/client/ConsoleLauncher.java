@@ -7,7 +7,7 @@ import org.apache.commons.cli.*;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ConsoleLauncher {
+public class ConsoleLauncher{
 
     private static class ServerConfig {
 
@@ -35,7 +35,7 @@ public class ConsoleLauncher {
 
     }
 
-    private void execute(String[] args) {
+    public void execute(String[] args) {
         Options options = new Options();
         options.addOption(Option.builder("gc")
                 .hasArgs()
@@ -64,7 +64,9 @@ public class ConsoleLauncher {
         console.start();
     }
 
-    private Map<NodeId, Address> parseGroupConfig(String[] rawGroupConfig) {
+
+
+    public Map<NodeId, Address> parseGroupConfig(String[] rawGroupConfig) {
         Map<NodeId, Address> serverMap = new HashMap<>();
         for (String rawServerConfig : rawGroupConfig) {
             ServerConfig serverConfig = parseServerConfig(rawServerConfig);
@@ -73,7 +75,7 @@ public class ConsoleLauncher {
         return serverMap;
     }
 
-    private ServerConfig parseServerConfig(String rawServerConfig) {
+    public ServerConfig parseServerConfig(String rawServerConfig) {
         String[] pieces = rawServerConfig.split(",");
         if (pieces.length != 3) {
             throw new IllegalArgumentException("illegal server config [" + rawServerConfig + "]");

@@ -27,6 +27,9 @@ abstract class AbstractHandler extends ChannelDuplexHandler {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        // Receive
+        // TODO: first send to node D:
+        // logger.debug("-----------------TESTAAAA", msg, remoteId);
         assert remoteId != null;
         assert channel != null;
 

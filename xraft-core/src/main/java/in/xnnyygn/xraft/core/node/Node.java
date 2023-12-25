@@ -5,6 +5,7 @@ import in.xnnyygn.xraft.core.node.role.RoleNameAndLeaderId;
 import in.xnnyygn.xraft.core.node.task.GroupConfigChangeTaskReference;
 
 import javax.annotation.Nonnull;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * Node.
@@ -17,6 +18,7 @@ public interface Node {
      *
      * @param stateMachine state machine
      */
+
     void registerStateMachine(@Nonnull StateMachine stateMachine);
 
     /**

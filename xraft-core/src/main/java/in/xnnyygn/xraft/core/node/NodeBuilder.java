@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 
 /**
@@ -244,8 +245,8 @@ public class NodeBuilder {
      * @return node
      */
     @Nonnull
-    public Node build() {
-        return new NodeImpl(buildContext());
+    public Node build(CountDownLatch... latch) {
+        return new NodeImpl(buildContext(), latch[0]);
     }
 
     /**

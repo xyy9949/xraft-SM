@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -16,14 +17,14 @@ import java.util.stream.Stream;
 public class ServerLauncher {
 
     private static final Logger logger = LoggerFactory.getLogger(ServerLauncher.class);
-    private static final String MODE_STANDALONE = "standalone";
-    private static final String MODE_STANDBY = "standby";
-    private static final String MODE_GROUP_MEMBER = "group-member";
+    protected static final String MODE_STANDALONE = "standalone";
+    protected static final String MODE_STANDBY = "standby";
+    protected static final String MODE_GROUP_MEMBER = "group-member";
 
     // TODO why volatile?
-    private volatile Server server;
+    public volatile Server server;
 
-    private void execute(String[] args) throws Exception {
+    public void execute(String[] args, CountDownLatch... latch) throws Exception {
         Options options = new Options();
         options.addOption(Option.builder("m")
                 .hasArg()
@@ -88,7 +89,7 @@ public class ServerLauncher {
                     startAsStandaloneOrStandby(cmdLine, false);
                     break;
                 case MODE_GROUP_MEMBER:
-                    startAsGroupMember(cmdLine);
+                    startAsGroupMember(cmdLine, latch[0]);
                     break;
                 default:
                     throw new IllegalArgumentException("illegal mode [" + mode + "]");
@@ -98,7 +99,7 @@ public class ServerLauncher {
         }
     }
 
-    private void startAsStandaloneOrStandby(CommandLine cmdLine, boolean standby) throws Exception {
+    public void startAsStandaloneOrStandby(CommandLine cmdLine, boolean standby) throws Exception {
         if (!cmdLine.hasOption("p1") || !cmdLine.hasOption("p2")) {
             throw new IllegalArgumentException("port-raft-node or port-service required");
         }
@@ -119,7 +120,7 @@ public class ServerLauncher {
         startServer(server);
     }
 
-    private void startAsGroupMember(CommandLine cmdLine) throws Exception {
+    public void startAsGroupMember(CommandLine cmdLine, CountDownLatch latch) throws Exception {
         if (!cmdLine.hasOption("gc")) {
             throw new IllegalArgumentException("group-config required");
         }
@@ -134,13 +135,13 @@ public class ServerLauncher {
 
         Node node = new NodeBuilder(nodeEndpoints, new NodeId(rawNodeId))
                 .setDataDir(cmdLine.getOptionValue('d'))
-                .build();
+                .build(latch);
         Server server = new Server(node, portService);
         logger.info("start as group member, group config {}, id {}, port service {}", nodeEndpoints, rawNodeId, portService);
         startServer(server);
     }
 
-    private NodeEndpoint parseNodeEndpoint(String rawNodeEndpoint) {
+    public NodeEndpoint parseNodeEndpoint(String rawNodeEndpoint) {
         String[] pieces = rawNodeEndpoint.split(",");
         if (pieces.length != 3) {
             throw new IllegalArgumentException("illegal node endpoint [" + rawNodeEndpoint + "]");
@@ -156,13 +157,13 @@ public class ServerLauncher {
         return new NodeEndpoint(nodeId, host, port);
     }
 
-    private void startServer(Server server) throws Exception {
+    public void startServer(Server server) throws Exception {
         this.server = server;
         this.server.start();
         Runtime.getRuntime().addShutdownHook(new Thread(this::stopServer, "shutdown"));
     }
 
-    private void stopServer() {
+    public void stopServer() {
         try {
             server.stop();
         } catch (Exception e) {

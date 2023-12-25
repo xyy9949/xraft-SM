@@ -67,6 +67,38 @@ public class Console {
             }
         }
     }
+    void startCommand() throws InterruptedException {
+        commandContext.setRunning(true);
+        showInfo();
+        executeCommand();
+    }
+
+    private void executeCommand() throws InterruptedException {
+        Thread.sleep(2000);
+        System.out.println("-----------------------running command 0------------------------");
+        runCommand("kvstore-set x 1");
+        Thread.sleep(2000);
+//        System.out.println("-----------------------running command 1------------------------");
+//        runCommand("kvstore-set x 2");
+//        Thread.sleep(2000);
+//        System.out.println("-----------------------running command 2------------------------");
+//        runCommand("kvstore-set x 3");
+//        Thread.sleep(2000);
+//        System.out.println("-----------------------running command 3------------------------");
+//        runCommand("kvstore-get x");
+    }
+
+    private void runCommand(String commandLine) {
+        String[] commandNameAndArguments = commandLine.split("\\s+", 2);
+        String commandName = commandNameAndArguments[0];
+        Command command = commandMap.get(commandName);
+        if (command == null) {
+            throw new IllegalArgumentException("no such command [" + commandName + "]");
+        }
+        command.execute(commandNameAndArguments.length > 1 ? commandNameAndArguments[1] : "", commandContext);
+
+    }
+
 
     private void showInfo() {
         System.out.println("Welcome to XRaft KVStore Shell\n");

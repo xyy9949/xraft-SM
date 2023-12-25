@@ -7,6 +7,7 @@ LIB_DIR=${BASE_DIR}/lib
 JAVA_EXECUTABLE=java
 
 CLASS_PATH=
+# shellcheck disable=SC2045
 for file in `ls ${LIB_DIR}`; do
     CLASS_PATH=${LIB_DIR}/${file}:${CLASS_PATH}
 done

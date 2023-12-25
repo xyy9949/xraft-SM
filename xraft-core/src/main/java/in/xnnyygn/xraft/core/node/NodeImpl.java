@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 
@@ -44,6 +45,10 @@ import java.util.concurrent.TimeoutException;
 public class NodeImpl implements Node {
 
     private static final Logger logger = LoggerFactory.getLogger(NodeImpl.class);
+
+//    public static CountDownLatch requestVoteCountDownLatch;
+//    public static CountDownLatch heartBeatCountDownLatch;
+    private CountDownLatch latch;
 
     // callback for async tasks.
     private static final FutureCallback<Object> LOGGING_FUTURE_CALLBACK = new FutureCallback<Object>() {
@@ -74,8 +79,9 @@ public class NodeImpl implements Node {
      *
      * @param context context
      */
-    NodeImpl(NodeContext context) {
+    NodeImpl(NodeContext context, CountDownLatch latch) {
         this.context = context;
+        this.latch = latch;
     }
 
     /**
@@ -129,6 +135,7 @@ public class NodeImpl implements Node {
         started = true;
     }
 
+    // append new log
     @Override
     public void appendLog(@Nonnull byte[] commandBytes) {
         Preconditions.checkNotNull(commandBytes);
@@ -278,10 +285,11 @@ public class NodeImpl implements Node {
      * <p>
      * Source: scheduler
      * </p>
-     */
+   x  */
     void electionTimeout() {
         context.taskExecutor().submit(this::doProcessElectionTimeout, LOGGING_FUTURE_CALLBACK);
     }
+
 
     private void doProcessElectionTimeout() {
         if (role.getName() == RoleName.LEADER) {
@@ -316,6 +324,8 @@ public class NodeImpl implements Node {
             rpc.setCandidateId(context.selfId());
             rpc.setLastLogIndex(lastEntryMeta.getIndex());
             rpc.setLastLogTerm(lastEntryMeta.getTerm());
+
+            // XYY: become candidate and send request vote:
             context.connector().sendRequestVote(rpc, context.group().listEndpointOfMajorExceptSelf());
         }
     }
@@ -421,7 +431,10 @@ public class NodeImpl implements Node {
             context.log().advanceCommitIndex(context.log().getNextIndex() - 1, role.getTerm());
             return;
         }
-        logger.debug("replicate log");
+        logger.debug("---------replicate log");
+
+        // XYY：
+
         for (GroupMember member : context.group().listReplicationTarget()) {
             if (member.shouldReplicate(context.config().getLogReplicationReadTimeout())) {
                 doReplicateLog(member, context.config().getMaxReplicationEntries());
@@ -429,6 +442,13 @@ public class NodeImpl implements Node {
                 logger.debug("node {} is replicating, skip replication task", member.getId());
             }
         }
+//        try{
+//            latch.await();
+//        }catch (InterruptedException e){
+//            throw new RuntimeException(e);
+//        }
+
+        logger.info("------------all threads received");
     }
 
     /**
@@ -470,6 +490,7 @@ public class NodeImpl implements Node {
     }
 
     private RequestVoteResult doProcessRequestVoteRpc(RequestVoteRpcMessage rpcMessage) {
+        // XYY: receive request vote
 
         // skip non-major node, it maybe removed node
         if (!context.group().isMemberOfMajor(rpcMessage.getSourceNodeId())) {
@@ -523,14 +544,26 @@ public class NodeImpl implements Node {
      */
     @Subscribe
     public void onReceiveRequestVoteResult(RequestVoteResult result) {
-        context.taskExecutor().submit(() -> doProcessRequestVoteResult(result), LOGGING_FUTURE_CALLBACK);
+        context.taskExecutor().submit(() -> {
+            try {
+                doProcessRequestVoteResult(result);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }, LOGGING_FUTURE_CALLBACK);
     }
 
     Future<?> processRequestVoteResult(RequestVoteResult result) {
-        return context.taskExecutor().submit(() -> doProcessRequestVoteResult(result));
+        return context.taskExecutor().submit(() -> {
+            try {
+                doProcessRequestVoteResult(result);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
-    private void doProcessRequestVoteResult(RequestVoteResult result) {
+    private void doProcessRequestVoteResult(RequestVoteResult result) throws InterruptedException {
 
         // step down if result's term is larger than current term
         if (result.getTerm() > role.getTerm()) {
@@ -556,11 +589,20 @@ public class NodeImpl implements Node {
         if (currentVotesCount > countOfMajor / 2) {
 
             // become leader
-            logger.info("become leader, term {}", role.getTerm());
+            logger.info("----------become leader, term {}", role.getTerm());
             resetReplicatingStates();
+
+            // XYY: node become leader and send heartbeat
+
             changeToRole(new LeaderNodeRole(role.getTerm(), scheduleLogReplicationTask()));
             context.log().appendEntry(role.getTerm()); // no-op log
             context.connector().resetChannels(); // close all inbound channels
+
+            logger.info("------------waiting for all threads to receive");
+//            latch.await();
+//
+//            logger.info("------------all threads received");
+
         } else {
 
             // update votes count
@@ -586,6 +628,9 @@ public class NodeImpl implements Node {
 
     private AppendEntriesResult doProcessAppendEntriesRpc(AppendEntriesRpcMessage rpcMessage) {
         AppendEntriesRpc rpc = rpcMessage.get();
+
+//        logger.info("------------ node receive appendEntries");
+//        latch.countDown();
 
         // reply current term if term in rpc is smaller than current term
         if (rpc.getTerm() < role.getTerm()) {
@@ -717,6 +762,7 @@ public class NodeImpl implements Node {
      */
     @Subscribe
     public void onReceiveInstallSnapshotRpc(InstallSnapshotRpcMessage rpcMessage) {
+        logger.info("-------------------11111111111");
         context.taskExecutor().submit(
                 () -> context.connector().replyInstallSnapshot(doProcessInstallSnapshotRpc(rpcMessage), rpcMessage),
                 LOGGING_FUTURE_CALLBACK
@@ -724,6 +770,7 @@ public class NodeImpl implements Node {
     }
 
     private InstallSnapshotResult doProcessInstallSnapshotRpc(InstallSnapshotRpcMessage rpcMessage) {
+        logger.info("-------------------22222222222");
         InstallSnapshotRpc rpc = rpcMessage.get();
 
         // reply current term if term in rpc is smaller than current term
